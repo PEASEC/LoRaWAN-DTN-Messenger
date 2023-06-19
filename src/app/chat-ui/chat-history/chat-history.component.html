@@ -1,0 +1,140 @@
+<ion-content [fullscreen]="true" #chatHistoryList>
+
+  <!--Chat History-->
+  <ion-list>
+    <div *ngIf="(selectedContact != undefined)">
+    <ion-item *ngFor="let elem of chatHistory[selectedContact.phoneNumber]" text-wrap>
+      <ion-grid [fixed]="true">
+        <!--if the message was send from the device the content is displayed on the right. If it was recieved from another device, it is displayed on the left-->
+        <!--recieved Messages-->
+        <ion-row *ngIf="elem.messageTag == 1">
+          <ion-col size="9">
+            <div class="ion-text-left">
+              <ion-label>{{convertTimestampToDateFormat(elem.message.timestamp)}}</ion-label>
+              <ion-label class="ion-text-wrap" *ngFor="let msg of elem.message.content.split('\n')">
+                {{msg}}
+              </ion-label>
+              <!--check if coordinates were recieved and show openstreetmap link-->
+              <div *ngIf="elem.messageContainsCoordinates">
+                <ion-label class="ion-text-wrap" color="secondary">Koordinaten im Text erkannt, generiere OpenStreetMapLink:
+                <a target="_blank" [href]="elem.messageCoordinatesOpenStreetMapLink">{{elem.messageCoordinatesOpenStreetMapLink}}</a></ion-label>
+              </div> 
+            </div>
+          </ion-col>
+          <ion-col></ion-col>
+        </ion-row>
+        <!--send messages-->
+        <ion-row *ngIf="elem.messageTag == 0">
+          <ion-col></ion-col>
+          <ion-col size="9">
+            <div class="ion-text-right">
+              <ion-row>
+                <ion-col>
+                  <ion-label>{{convertTimestampToDateFormat(elem.message.timestamp)}}</ion-label>
+                </ion-col>
+                <ion-col size="auto">
+                  <ion-icon *ngIf="elem.messageIsSend" name="checkmark-outline"></ion-icon>
+                  <ion-icon *ngIf="!elem.messageIsSend" name="sync-outline"></ion-icon>
+                </ion-col>
+              </ion-row>                
+              <ion-label class="ion-text-wrap" *ngFor="let msg of elem.message.content.split('\n')">
+                {{msg}}
+              </ion-label>               
+            </div>
+          </ion-col>
+        </ion-row>
+      </ion-grid>
+    </ion-item>
+    </div>
+  </ion-list>
+
+  <!--SOS Button-->
+  <ion-fab slot="fixed" vertical="top" horizontal="end">
+    <ion-fab-button id="SOS-Button" color="danger" (click)="sendSOSMessage()">
+      <ion-label>SOS</ion-label>
+    </ion-fab-button>
+    <ion-fab-button size="small" id="SOS-Info-Button" (click)="sosPopoverInfoIsOpen = true">
+      <ion-icon name="information-circle-outline"></ion-icon>
+    </ion-fab-button>
+  </ion-fab>
+
+  <!--SOS Popover-->
+  <ion-popover [isOpen]="sosPopoverIsOpen" (didDismiss)="dismissSOSPopover()">
+    <ng-template>
+      <ion-list>
+        <ion-item color="danger">
+          <ion-label class="ion-text-center">SOS Nachricht wird<br>versendet in</ion-label>
+        </ion-item>
+        <ion-item color="danger">
+          <ion-label class="ion-text-center"><h1>{{sosMessageTimerUI}}</h1></ion-label>
+        </ion-item>
+        <ion-item color="danger" class="ion-text-center">
+          <ion-icon slot="start"></ion-icon>
+          <ion-buttons>
+            <ion-button size="large" (click)="cancelSOSMessage()">Abbrechen</ion-button>
+          </ion-buttons>
+          <ion-icon slot="end"></ion-icon>
+        </ion-item>
+      </ion-list>
+    </ng-template>
+  </ion-popover>
+
+  <!--SOS Info Popover-->
+  <ion-popover [isOpen]="sosPopoverInfoIsOpen" (didDismiss)="sosPopoverInfoIsOpen = false">
+    <ng-template>
+      <ion-list>
+        <ion-item>
+          <ion-title>SOS-Nachrichten<br>Information</ion-title>
+        </ion-item>
+        <ion-item>
+          <ion-label class="ion-text-wrap">
+            Mit dem SOS-Knopf können sie, im Falle eines Notfalls, eine SOS-Nachricht versenden.
+            Die Nachricht wird an den von Ihnen hinterlegten Kontakt, in den Einstellungen, gesendet und an alle Geräte die sich aktuell in Reichweite Ihrer Hofbox befinden.
+          </ion-label>
+        </ion-item>
+        <ion-item>
+          <ion-label class="ion-text-wrap">
+            Sollten sie keinen Kontakt hinterlegt haben, dann wird die Nachricht dennoch versendet, jedoch nur an alle Geräte in Reichweite.
+          </ion-label>
+        </ion-item>
+        <ion-item>
+          <ion-label class="ion-text-wrap">
+            Der Inhalt der SOS-Nachricht besteht aus einen kurzen vorgefertigten Text, den sie in den Einstellungen definieren können.
+            Zusätzlich werden ihre GPS Koordinaten versendet, damit andere Nutzer*Innen sie besser finden können.
+          </ion-label>
+        </ion-item>
+        <ion-item>
+          <ion-label class="ion-text-wrap">
+            Sollten sie keine Nachricht in den Einstellungen definiert haben, dann wird standardmäßig folgender Text versendet: "Ich habe einen Notfall und benötige Hilfe!"
+          </ion-label>
+        </ion-item>
+        <ion-item>
+          <ion-label class="ion-text-wrap">
+            Sollten sie mal versehentlich auf den SOS Knopf gekommen sein, dann werden sie mit einen neuen Fenster konfrontiert in dem sie {{sosMessageTimer}} Sekunden Zeit haben den Prozess abzubrechen.
+            Nach Ablauf der Zeit wird die Nachricht versendet.
+          </ion-label>
+        </ion-item>
+      </ion-list>
+    </ng-template>
+  </ion-popover>
+
+  <!--SOS Confirm Popover-->
+  <ion-popover [isOpen]="sosPopoverConfirmIsOpen" (didDismiss)="sosPopoverConfirmIsOpen = false">
+    <ng-template>
+      <ion-item color="danger">
+          <ion-label class="ion-text-center"><h1>SOS Nachricht<br>wurde versandt</h1></ion-label>
+      </ion-item>
+    </ng-template>
+  </ion-popover>
+
+  <!--SOS Abort Popover-->
+  <ion-popover [isOpen]="sosPopoverAbortIsOpen" (didDismiss)="sosPopoverAbortIsOpen = false">
+    <ng-template>
+      <ion-item color="danger">
+        <ion-label class="ion-text-center"><h1>Abgebrochen</h1></ion-label>
+      </ion-item>
+    </ng-template>
+  </ion-popover>
+
+
+</ion-content>

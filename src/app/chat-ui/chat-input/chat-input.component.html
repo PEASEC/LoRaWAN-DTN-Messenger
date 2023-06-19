@@ -1,0 +1,8 @@
+<ion-toolbar>
+  <ion-textarea inputmode="text" [(ngModel)]="chatInput" placeholder="Nachricht eingeben..." autoGrow="true" rows="1" (keydown)="checkKeyboardEvent($event)"></ion-textarea>
+  <ion-buttons slot="primary">
+    <ion-button shape="round" (click)="inputMessage()">
+      <ion-icon name="paper-plane-outline"></ion-icon>
+    </ion-button>
+  </ion-buttons>
+</ion-toolbar>

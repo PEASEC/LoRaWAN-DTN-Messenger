@@ -1,0 +1,490 @@
+<ion-toolbar>
+  <ion-buttons slot="start">
+    <ion-button id="open-contacts" expand="block">
+      <ion-icon slot="icon-only" name="people-outline"></ion-icon>
+    </ion-button>
+    <ion-icon *ngIf="unreadMessagesForContacts.length > 0" slot="icon-only" name="alert-outline"></ion-icon>
+  </ion-buttons>
+  <ion-title class="ion-text-center" *ngIf="this.connectionStatus == true" color="success">Verbunden</ion-title>
+  <ion-title class="ion-text-center" *ngIf="this.connectionStatus == false" color="danger">Keine Verbindung</ion-title>
+  <ion-buttons slot="end">
+    <ion-icon *ngIf="unreadMessagesForContacts.length > 0" slot="icon-only"></ion-icon>
+    <ion-button id="open-settings" expand="block">
+      <ion-icon slot="icon-only" name="cog-outline"></ion-icon>
+    </ion-button>
+  </ion-buttons>
+</ion-toolbar>
+<ion-toolbar color="light">
+  <ion-item>
+    <ion-label class="ion-text-center" *ngIf="(selectedContactForMessaging == undefined)">Bitte Kontakt auswählen</ion-label>
+    <ion-label slot="start" class="ion-text-wrap" *ngIf="(selectedContactForMessaging != undefined)">{{selectedContactForMessaging.name}}</ion-label>
+    <ion-label slot="end" *ngIf="(selectedContactForMessaging != undefined)">Tel.:{{selectedContactForMessaging.phoneNumber}}</ion-label>
+  </ion-item>
+</ion-toolbar>
+
+<!--Contacts Modal-->
+<ion-modal id="contactsModal" trigger="open-contacts" (willDismiss)="contactsOnDismiss($event)">
+  <ng-template>
+
+    <!--Header-->
+    <ion-header>
+      <ion-grid>
+        <ion-row>
+          <ion-col>
+            <ion-title class="ion-text-center">Kontakte</ion-title>
+          </ion-col>
+        </ion-row>
+        <ion-row>
+          <ion-segment [(ngModel)]="contactModalType" value="showContacts">
+            <ion-segment-button value="showContacts">
+              <ion-label>Kontakt auswählen</ion-label>
+            </ion-segment-button>
+            <ion-segment-button value="showContactManagement">
+              <ion-label>Kontakte verwalten</ion-label>
+            </ion-segment-button>
+          </ion-segment>
+        </ion-row>
+      </ion-grid>
+    </ion-header>
+
+    <!--Content-->
+    <ion-content class="ion-padding">
+      <div [ngSwitch]="contactModalType">
+
+      <!--Select Contact-->
+      <div *ngSwitchCase="'showContacts'">
+        <ion-list>
+          <ion-item *ngFor="let contact of contactsLoadContacts()">
+            <ion-buttons>
+              <ion-button (click)="contactsSelectContactUI(contact)">{{contact.name}}</ion-button>
+            </ion-buttons>
+            <ion-icon *ngIf="contactsCheckForUnreadMessagesForContact(contact.phoneNumber)" name="alert-outline"></ion-icon>
+          </ion-item>
+        </ion-list>
+      </div>
+
+      <!--Contact Management-->
+      <div *ngSwitchCase="'showContactManagement'">
+        <ion-list>
+          <ion-item-group>
+
+            <!--Import Contacts-->
+            <ion-item-divider color="medium">
+              <ion-label slot="start"><h2>Kontakte importieren</h2></ion-label>
+            </ion-item-divider>
+            <ion-item>
+              <ion-select [(ngModel)]="selectedContactForImport" placeholder="Kontakt zum Importieren auswählen">
+                <ion-select-option *ngFor="let contact of importedContactListFromDevice" [value]="contact">{{contact.name}}</ion-select-option>
+              </ion-select>
+            </ion-item>
+            <div *ngIf="selectedContactForImport != undefined">
+              <div *ngIf="convertAndCheckImportedPhoneNumber() == false">
+                <ion-item>
+                  <ion-label class="ion-text-wrap" color="warning">
+                    Die Telefonnummer liegt nicht im korrekten Format vor, bitte führen sie eine Anpassung durch!<br>
+                    Das von der App akzeptierte Format ist E.123 im internationalen Format ohne Leerzeichen z.B. +495789567<br>
+                    Diese Anpassung führt nicht zu einer Änderung des Kontakts in Ihrem Adressbuch.
+                  </ion-label>
+                </ion-item>
+                <ion-item>
+                  <ion-label>Telefonnnummer: {{selectedContactForImport.phoneNumber}} </ion-label>
+                </ion-item>
+                <ion-item>
+                  <ion-label position="stacked">Angepasste Telefonnummer eingeben</ion-label>
+                  <ion-input type="tel" placeholder="+4989123456" [(ngModel)]="importContactPhoneNumber" [pattern]="telephoneNumberPattern"></ion-input>
+                  <ion-note slot="error">Bitte Telefonnummer im korrekten Format angeben z.B. +491234567</ion-note>
+                </ion-item>
+              </div>
+              <ion-item>
+                <ion-buttons>
+                  <ion-button (click)="contactsImportContactFromDevice(selectedContactForImport)">Kontakt importieren</ion-button>
+                </ion-buttons>
+              </ion-item>
+            </div>
+            <ion-item *ngIf="statusContactImportInvalidInput">
+              <ion-label color="danger">Kontakt konnte nicht importiert werden.<br>Bitte Eingabe prüfen!</ion-label>
+            </ion-item>
+            <ion-item *ngIf="statusContactAlreadyExistsImportContact">
+              <ion-label color="danger">Telefonnummer existiert bereits!</ion-label>
+            </ion-item>
+            <ion-item *ngIf="statusContactSuccessfullyImported">
+              <ion-label color="success">Kontakt erfolgreich hinzugefügt</ion-label>
+            </ion-item>
+
+            <!--Add new Contact-->
+            <ion-item-divider color="medium">
+              <ion-label slot="start"><h2>Neuen Kontakt hinzufügen</h2></ion-label>
+            </ion-item-divider>
+            <ion-item>
+              <ion-label position="stacked">Namen eingeben</ion-label>          
+              <ion-input type="text" placeholder="Max Mustermann" [(ngModel)]="newContactName"></ion-input>
+            </ion-item>
+            <ion-item>
+              <ion-label position="stacked">Telefonnummer eingeben</ion-label>
+              <ion-input type="tel" placeholder="+4989123456" [(ngModel)]="newContactPhoneNumber" [pattern]="telephoneNumberPattern"></ion-input>
+              <ion-note slot="error">Bitte Telefonnummer im korrekten Format angeben z.B. +491234567</ion-note>
+            </ion-item>
+            <ion-item>
+              <ion-buttons>
+                <ion-button (click)="contactsAddContact()">Kontakt hinzufügen</ion-button>
+              </ion-buttons>
+            </ion-item>
+            <ion-item *ngIf="statusContactAlreadyExistsNewContact">
+              <ion-label color="danger">Telefonnummer existiert bereits!</ion-label>
+            </ion-item>
+            <ion-item *ngIf="statusContactSuccessfullyAdded">
+              <ion-label color="success">Kontakt erfolgreich hinzugefügt</ion-label>
+            </ion-item>
+
+            <!--Change Existing Contact-->
+            <ion-item-divider color="medium">
+              <ion-label><h2>Vorhandenen Kontakt ändern</h2></ion-label>
+            </ion-item-divider>
+            <ion-item>
+              <ion-select [(ngModel)]="selectedContactForChange" placeholder="Kontakt zum Ändern auswählen">
+                <ion-select-option *ngFor="let contact of contactsLoadContacts()" [value]="contact">{{contact.name}}</ion-select-option>
+              </ion-select>
+            </ion-item>
+            <div *ngIf="selectedContactForChange != undefined">
+              <ion-item>
+                <label>Alter Name: {{selectedContactForChange.name}}</label>
+              </ion-item>
+              <ion-item>
+                <label>Alte Telefonnummer: {{selectedContactForChange.phoneNumber}}</label>
+              </ion-item>
+              <ion-item>
+                <ion-label position="stacked">Neuen Namen eingeben</ion-label>          
+                <ion-input type="text" placeholder="Max Mustermann" [(ngModel)]="changeContactName"></ion-input>
+              </ion-item>
+              <ion-item>
+                <ion-label position="stacked">Neue Telefonnummer eingeben</ion-label>
+                <ion-input type="tel" placeholder="+4989123456" [(ngModel)]="changeContactPhoneNumber" [pattern]="telephoneNumberPattern"></ion-input>
+                <ion-note slot="error">Bitte Telefonnummer im korrekten Format angeben z.B. +491234567</ion-note>
+              </ion-item>
+              <ion-item>
+                <ion-buttons>
+                  <ion-button (click)="contactsChangeContact()">Kontakt ändern</ion-button>
+                </ion-buttons>
+              </ion-item>
+            </div>        
+            <ion-item *ngIf="statusContactChangeInvalidInput">
+              <ion-label color="danger">Bitte Eingabe überprüfen</ion-label>
+            </ion-item>
+            <ion-item *ngIf="statusContactAlreadyExistsChangeContact">
+              <ion-label color="danger">Kontakt existiert bereits!</ion-label>
+            </ion-item>
+            <ion-item *ngIf="statusContactSuccessfullyChanged">
+              <ion-label color="success">Kontakt erfolgreich geändert</ion-label>
+            </ion-item>
+
+            <!--Remove Existing Contact-->
+            <ion-item-divider color="medium">
+              <ion-label><h2>Vorhandenen Kontakt entfernen</h2></ion-label>
+            </ion-item-divider>
+            <ion-item>
+              <ion-select [(ngModel)]="selectedContactForRemoval" placeholder="Kontakt zum Entfernen auswählen">
+                <ion-select-option *ngFor="let contact of contactsLoadContacts()" [value]="contact">{{contact.name}}</ion-select-option>
+              </ion-select>
+            </ion-item>
+            <div *ngIf="selectedContactForRemoval != undefined">
+              <ion-item>
+                <ion-buttons>
+                  <ion-button (click)="contactsRemoveContact()">Kontakt entfernen</ion-button>
+                </ion-buttons>
+              </ion-item>
+            </div>
+            <ion-item *ngIf="statusContactSuccessfullyRemoved">
+              <ion-label color="success">Kontakt erfolgreich entfernt</ion-label>
+            </ion-item>
+            <ion-item>
+              <ion-label class="ion-text-wrap" color="warning">Das Entfernen eines Kontaktes führt ebenfalls zur Löschung dessen Chat Verlaufes</ion-label>
+            </ion-item>
+          </ion-item-group>
+        </ion-list>
+      </div>
+    </div>
+    </ion-content>
+
+  </ng-template>
+</ion-modal>
+
+<!--Settings Modal-->
+<ion-modal id="settingsModal" trigger="open-settings" (willDismiss)="settingsOnDismiss($event)">
+  <ng-template>
+
+    <!--Header-->
+    <ion-header>
+      <ion-toolbar>
+        <ion-buttons slot="start">
+          <ion-button (click)="settingsCancelUI()" [strong]="true">Abbrechen</ion-button>
+        </ion-buttons>
+        <ion-title class="ion-text-center">Einstellungen</ion-title>
+        <ion-buttons slot="end">
+          <ion-button (click)="settingsConfirmUI()" [strong]="true">Bestätigen</ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+      <ion-toolbar>
+        <ion-segment [(ngModel)]="settingsModalType" value="showNetwork">
+          <ion-segment-button value="showNetwork">
+            <ion-label>Netzwerk</ion-label>
+          </ion-segment-button>
+          <ion-segment-button value="showSOS">
+            <ion-label>SOS-Nachrichten</ion-label>
+          </ion-segment-button>
+        </ion-segment>
+      </ion-toolbar>
+    </ion-header>
+
+    <!--Content-->
+    <ion-content class="ion-padding">
+      <div [ngSwitch]="settingsModalType">
+
+        <!--Network-->
+        <div *ngSwitchCase="'showNetwork'">
+          <ion-list>
+
+            <!--Item Divider-->
+            <ion-item-divider color="medium">
+              <ion-label><h2>Anmeldung auf Netzwerk</h2></ion-label>
+            </ion-item-divider>
+
+            <!--Server Address-->
+            <ion-item>
+              <ion-label position="stacked">Server-Adresse eingeben</ion-label>          
+              <ion-input type="decimal" placeholder="example:8080, 192.168.0.1:8080 or [fe80::1]:8080" [(ngModel)]="serverAddressUI" [pattern]="serverAdressPattern"></ion-input>
+              <ion-note slot="error">Bitte korrekte IP-Adresse oder URL eingeben</ion-note>
+              <ion-buttons slot="end">
+                <ion-button id="server-adress-information">
+                  <ion-icon slot="icon-only" name="information-circle-outline"></ion-icon>
+                </ion-button>
+              </ion-buttons>
+              <ion-popover trigger="server-adress-information" triggerAction="click" size="auto" side="left" alignment="center">
+                <ng-template>
+                  <ion-content class="ion-padding">
+                    Server Adresse und Netzwerk Port des LoRaWAN Gateways eingeben.<br>
+                    Dies kann in folgenden Formaten erfolgen:<br>
+                    DNS: example:8080<br>
+                    IPv4: 192.168.0.1:8080<br>
+                    IPv6: [fe80::1]:8080<br>
+                    Anschließend "Auf Hofbox anmelden" Knopf betätigen.
+                  </ion-content>
+                </ng-template>
+              </ion-popover>
+            </ion-item>
+
+            <!--Device Phonenumber-->
+            <ion-item>
+              <ion-label position="stacked">Geben Sie Ihre Telefonnummer ein</ion-label>
+              <ion-input type="tel" placeholder="+4989123456" [(ngModel)]="deviceTelephoneNumberUI" [pattern]="telephoneNumberPattern"></ion-input>
+              <ion-note slot="error">Bitte korrekte Telefonnummer eingeben</ion-note>
+              <ion-buttons slot="end">
+                <ion-button id="telephone-number-information">
+                  <ion-icon slot="icon-only" name="information-circle-outline"></ion-icon>
+                </ion-button>
+              </ion-buttons>
+              <ion-popover trigger="telephone-number-information" triggerAction="click" size="auto" side="left" alignment="center">
+                <ng-template>
+                  <ion-content class="ion-padding">
+                      Telefonnummer des Gerätes angeben.
+                      Diese wird verwendet um das Gerät im Netzwerk zu identifizieren.<br>
+                      Solange keine Telefonnummer hinterlegt ist, können keine Nachrichten empfangen oder gesendet werden.<br>
+                      Die Nummer muss im internationalen E.123 Format, ohne Leerzeichen angegeben werden.<br>
+                      Beispiel: +4912341234
+                  </ion-content>
+                </ng-template>
+              </ion-popover>
+            </ion-item>
+
+            <!--Connect to Server-->
+            <ion-item>
+              <ion-buttons>
+                <ion-button (click)="connectToServerUI()" [strong]="true">Auf Hofbox anmelden</ion-button>
+              </ion-buttons>
+              <ion-buttons slot="end">
+                <ion-button id="connectToServer-information">
+                  <ion-icon slot="icon-only" name="information-circle-outline"></ion-icon>
+                </ion-button>
+              </ion-buttons>
+              <ion-popover trigger="connectToServer-information" triggerAction="click" size="auto" side="left" alignment="center">
+                <ng-template>
+                  <ion-content class="ion-padding">
+                      Es wird versucht eine Verbindung zur Hofbox, unter der angegebenen Server Adresse, herzustellen.<br>
+                      Der Status des Verbindungsaufbaus kann im Verbindungsprotokoll eingesehen werden.<br>
+                      Die Telefonnummer wird mit der Ausführung des "Bestätigen" Knopfes auf der Hofbox hinterlegt.
+                  </ion-content>
+                </ng-template>
+              </ion-popover>
+            </ion-item>
+            <ion-item *ngIf="statusServerConnectionSuccessfull && displayConnectionStatusMessages">
+              <ion-label class="ion-text-wrap" color="success">Verbindung erfolgreich hergestellt!<br> Drücken sie nun den Bestätigen Knopf um ihre Telefonnummer zu registrieren und den Anmeldeprozess abzuschließen.</ion-label>
+            </ion-item>
+            <ion-item *ngIf="statusServerConnectionFailure && displayConnectionStatusMessages">
+              <ion-label class="ion-text-wrap" color="danger">Verbindung konnte nicht hergestellt werden!<br> Bitte prüfen sie das Verbindungsprotokoll.</ion-label>
+            </ion-item>
+
+            <!--Connection Status Log-->
+            <ion-accordion-group expand="inset" #statusLogAccordion>
+              <ion-accordion>
+                <ion-item slot="header">
+                  <ion-toolbar>
+                    <ion-label>Verbindungsprotokoll</ion-label>
+                    <ion-buttons slot="start">
+                      <ion-button shape="round" (click)="emptyStatusLog($event)">
+                        <ion-icon slot="icon-only" name="trash-bin-outline" color="danger"></ion-icon>
+                      </ion-button>
+                    </ion-buttons>
+                  </ion-toolbar>
+                </ion-item>
+                <ion-list slot="content">
+                  <ion-item *ngFor="let state of statusLog">
+                    <ion-label class="ion-text-wrap">{{state}}</ion-label>
+                  </ion-item>
+                </ion-list>
+              </ion-accordion>
+            </ion-accordion-group>
+
+            <!--Item Divider-->
+            <ion-item-divider color="medium">
+              <ion-label><h2>Abmeldung und App-Speicher</h2></ion-label>
+            </ion-item-divider>
+
+            <!--Sign off from Server-->
+            <ion-item>
+              <ion-buttons>
+                <ion-button (click)="signOffFromServer()" [strong]="true">Von Hofbox abmelden</ion-button>
+              </ion-buttons>
+              <ion-buttons slot="end">
+                <ion-button id="signOffFromServer-information">
+                  <ion-icon slot="icon-only" name="information-circle-outline"></ion-icon>
+                </ion-button>
+              </ion-buttons>
+              <ion-popover trigger="signOffFromServer-information" triggerAction="click" size="auto" side="left" alignment="center">
+                <ng-template>
+                  <ion-content class="ion-padding">
+                      Nutzung nur notwendig, wenn sie sich mit einer anderen Hofbox verbinden wollen.<br>
+                      Ihre Telefonnummer wird auf der aktuell verbunden Hofbox entfernt und die Verbindung geschlossen.<br>
+                      Dieser Prozess kann einige Sekunden dauern!
+                  </ion-content>
+                </ng-template>
+              </ion-popover>
+            </ion-item>
+
+            <!--Delete Filesystem-->
+            <ion-item>
+              <ion-buttons>
+                <ion-button (click)="settingsDeleteDataFromFilesystemStorage()" [strong]="true">App-Speicher löschen</ion-button>
+              </ion-buttons>
+              <ion-buttons slot="end">
+                <ion-button id="deleteFilesystemStorage-information">
+                  <ion-icon slot="icon-only" name="information-circle-outline"></ion-icon>
+                </ion-button>
+              </ion-buttons>
+              <ion-popover trigger="deleteFilesystemStorage-information" triggerAction="click" size="auto" side="left" alignment="center">
+                <ng-template>
+                  <ion-content class="ion-padding">
+                      Der App-Speicher wird geleert. Die folgenden Daten werden von Ihrem Gerät gelöscht:<br>
+                      Netzwerkeinstellungen<br>
+                      Kontakte<br>
+                      Chatverlauf<br>
+                      Die Deinstallation der App löscht ebenfalls den App-Speicher!
+                  </ion-content>
+                </ng-template>
+              </ion-popover>
+            </ion-item>
+
+          </ion-list>        
+        </div>
+
+        <!--SOS-Messages-->
+        <div *ngSwitchCase="'showSOS'">
+          <ion-list>
+
+            <!--Item Divider-->
+            <ion-item-divider color="medium">
+              <ion-label><h2>SOS Kontakt</h2></ion-label>
+            </ion-item-divider>
+
+            <!--Select Contact for SOS-Messages-->
+            <div *ngIf="determinedContactForSOSMessages != undefined">
+              <ion-item>
+                <ion-label class="ion-text-wrap">Aktuell ausgewählter Kontakt für SOS Nachrichten</ion-label>
+              </ion-item>
+              <ion-item>
+                <ion-label>Name: {{determinedContactForSOSMessages.name}}</ion-label>
+              </ion-item>
+              <ion-item>
+                <ion-label>Telefonnummer: {{determinedContactForSOSMessages.phoneNumber}}</ion-label>
+              </ion-item>
+            </div>
+            <div *ngIf="determinedContactForSOSMessages == undefined">
+              <ion-item>
+                <ion-select slot="start" [(ngModel)]="selectedContactForSOSMessages" placeholder="Kontakt auswählen">
+                  <ion-select-option *ngFor="let contact of contactsLoadContacts()" [value]="contact">{{contact.name}}</ion-select-option>
+                </ion-select>
+                <ion-buttons slot="end">
+                  <ion-button id="contactForSOS-information">
+                    <ion-icon slot="icon-only" name="information-circle-outline"></ion-icon>
+                  </ion-button>
+                </ion-buttons>
+                <ion-popover trigger="contactForSOS-information" triggerAction="click" size="auto" side="left" alignment="center">
+                  <ng-template>
+                    <ion-content class="ion-padding">
+                      <ion-label class="ion-text-wrap">
+                        Hiermit können sie einen Kontakt auswählen, der von Ihnen versendete SOS Nachrichten empfangen soll.
+                        Zusätzlich zu diesen Kontakt werden Ihre SOS Nachrichten automatisch an alle registrierten Benutzer*Innen der Umgebung übertragen.
+                      </ion-label>
+                    </ion-content>
+                  </ng-template>
+                </ion-popover>
+              </ion-item>
+              <ion-item *ngIf="selectedContactForSOSMessages != undefined">
+                <ion-buttons>
+                  <ion-button (click)="settingsSetSOSContact()">Kontakt als Empfänger setzen</ion-button>
+                </ion-buttons>
+              </ion-item>
+            </div>
+            <div *ngIf="determinedContactForSOSMessages != undefined">
+              <ion-item>
+                <ion-buttons>
+                  <ion-button (click)="settingsRemoveSOSContact()">Kontakt zurücksetzen</ion-button>
+                </ion-buttons>
+              </ion-item>
+            </div>
+
+            <!--Item Divider-->
+            <ion-item-divider color="medium">
+              <ion-label><h2>SOS Nachricht</h2></ion-label>
+            </ion-item-divider>
+
+            <!--Define SOS-Message-->
+            <ion-item>
+              <ion-label class="ion-text-wrap" position="stacked">Geben Sie eine SOS Nachricht ein (maximal 200 Zeichen)</ion-label>
+              <ion-input [(ngModel)]="sosMessageInputUI" maxlength="200"></ion-input>
+            </ion-item>
+            <ion-item>
+              <ion-list>
+                <ion-label class="ion-text-wrap">Sollten sie keine Nachricht definieren wird folgender Text versandt:</ion-label>
+                <ion-label class="ion-text-wrap"><b>Ich habe einen Notfall und benötige Hilfe!</b></ion-label> 
+                <ion-label class="ion-text-wrap">
+                  Zusätzlich zum Nachrichtentext werden auch Ihre Standortkoordinaten versendet. 
+                  Stellen sie bitte sicher das sie der App die notwendigen Berechtigungen erteilt haben und das Ihr Standortdienst aktiviert ist.
+                </ion-label> 
+              </ion-list>
+            </ion-item>
+
+            <!--Item Divider-->
+            <ion-item-divider color="medium">
+              <ion-label><h2>SOS Information</h2></ion-label>
+            </ion-item-divider>
+            <!--SOS-Messages Information-->
+            <ion-label class="ion-text-wrap">Für mehr Informationen betätigen sie bitte das Informationssymbol unterhalb des SOS Knopfes</ion-label>
+
+          </ion-list>
+        </div>
+    
+      </div>
+    </ion-content>
+    
+  </ng-template>
+</ion-modal>
+

@@ -1,0 +1,7 @@
+{
+  "name": "dtnmessenger",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular"
+}
